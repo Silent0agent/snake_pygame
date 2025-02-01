@@ -40,7 +40,7 @@ def load_level(filename):
 
 sprites_sheets = ['sprites_sheet_1.png', 'sprites_sheet_2.png']
 empty_images = ['tile1.jpg', 'tile2.jpg', 'tile3.jpg']
-wall_images = ['wall1.jpg', 'wall2.jpg', 'wall3.jpg', 'wall4.jpg']
+wall_images = ['wall1.jpg', 'wall2.jpg']
 apple_images = ['apple1.png', 'apple2.png']
 snake_images = {}
 other_images = {'empty': load_image('tile1.jpg'),
@@ -635,6 +635,7 @@ def play():
                         snake_alive = True
                         game_over_flag = False
                         reset_sprites()
+                        direction = 'right'
                         level = [i[:] for i in start_level[:]]
                         snake = Snake(start_snake_coords[:])
                         create_apple(level, snake)
