@@ -13,6 +13,7 @@ mini_tiles_group = pygame.sprite.Group()
 tiles_group = pygame.sprite.Group()
 snake_group = pygame.sprite.Group()
 game_over_group = pygame.sprite.Group()
+settings_group = pygame.sprite.Group()
 
 
 def terminate():
@@ -37,10 +38,14 @@ def load_level(filename):
     return list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
 
 
-tile_images = {'empty': load_image('tile.jpg'),
-               'wall': load_image('wall.jpg')}
+sprites_sheets = ['sprites_sheet_1.png', 'sprites_sheet_2.png']
+empty_images = ['tile1.jpg', 'tile2.jpg', 'tile3.jpg']
+wall_images = ['wall1.jpg', 'wall2.jpg', 'wall3.jpg', 'wall4.jpg']
+apple_images = ['apple1.png', 'apple2.png']
 snake_images = {}
-apple_image = []
+other_images = {'empty': load_image('tile1.jpg'),
+                'wall': load_image('wall1.jpg'),
+                'apple': load_image('apple1.png')}
 
 
 def cut_sheet(sheet, columns, rows):
@@ -74,8 +79,6 @@ def cut_sheet(sheet, columns, rows):
     snake_images['end_right'] = sheet.subsurface(pygame.Rect(frame_location, rect.size))
     frame_location = (200, 150)
     snake_images['end_up'] = sheet.subsurface(pygame.Rect(frame_location, rect.size))
-    frame_location = (0, 150)
-    apple_image.append(sheet.subsurface(pygame.Rect(frame_location, rect.size)))
 
 
 cut_sheet(load_image('sprites_sheet_1.png'), 5, 4)
@@ -91,7 +94,7 @@ def reset_sprites():
 class MiniTile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
         super().__init__(mini_tiles_group, all_sprites)
-        tile_image = tile_images[tile_type]
+        tile_image = other_images[tile_type]
         scaled_image = pygame.transform.scale(tile_image, (
             int(tile_image.get_width() / 50 * 15), int(tile_image.get_height() / 50 * 15)))
         self.image = scaled_image
@@ -100,26 +103,35 @@ class MiniTile(pygame.sprite.Sprite):
 
 
 class Tile(pygame.sprite.Sprite):
-    def __init__(self, tile_type, pos_x, pos_y):
+    def __init__(self, tile_type, x, y, scaled=True):
         super().__init__(tiles_group, all_sprites)
-        tile_image = tile_images[tile_type]
-        scaled_image = pygame.transform.scale(tile_image, (
-            int(tile_image.get_width() / 50 * 25), int(tile_image.get_height() / 50 * 25)))
-        self.image = scaled_image
-        self.rect = self.image.get_rect().move(
-            25 * pos_x, 25 * pos_y)
+        tile_image = other_images[tile_type]
+        if scaled:
+            scaled_image = pygame.transform.scale(tile_image, (
+                int(tile_image.get_width() / 50 * 25), int(tile_image.get_height() / 50 * 25)))
+            self.image = scaled_image
+            self.rect = self.image.get_rect().move(
+                TILE_SIZE * x, TILE_SIZE * y)
+        else:
+            self.image = tile_image
+            self.rect = self.image.get_rect().move(
+                50 * x, 50 * y)
 
 
 class SnakePart(pygame.sprite.Sprite):
-    def __init__(self, type, x, y):
+    def __init__(self, type, x, y, scaled=True):
         super().__init__(snake_group, all_sprites)
         self.frames = []
         snake_image = snake_images[type]
-        scaled_image = pygame.transform.scale(snake_image, (
-            int(snake_image.get_width() / 50 * 25), int(snake_image.get_height() / 50 * 25)))
-        self.image = scaled_image
-        self.rect = self.image.get_rect()
-        self.rect = self.rect.move(x * 25, y * 25)
+        if scaled:
+            scaled_image = pygame.transform.scale(snake_image, (
+                int(snake_image.get_width() / 50 * 25), int(snake_image.get_height() / 50 * 25)))
+            self.image = scaled_image
+            self.rect = self.image.get_rect().move(
+                TILE_SIZE * x, TILE_SIZE * y)
+        else:
+            self.image = snake_image
+            self.rect = self.image.get_rect().move(x * 50, y * 50)
 
 
 class Snake:
@@ -127,19 +139,20 @@ class Snake:
         self.snake_coords = snake_coords
         self.direction = 'right'
         self.score = 0
-        self.unavailable_moves = {'up': 'down',
-                                  'down': 'up',
-                                  'left': 'right',
-                                  'right': 'left'}
+        self.forbidden_moves = {'up': 'down',
+                                'down': 'up',
+                                'left': 'right',
+                                'right': 'left'}
 
     def change_direction(self, direction):
-        if self.unavailable_moves[direction] != self.direction:
+        if self.forbidden_moves[direction] != self.direction:
             self.direction = direction
 
     def move(self, level):
         last_x, last_y = self.snake_coords[-1][0], self.snake_coords[-1][1]
         if self.direction == 'right':
-            if last_x + 1 > len(level) - 1 or level[last_y][last_x + 1] == '#':
+            if last_x + 1 > len(level) - 1 or level[last_y][last_x + 1] == '#' or (
+                    last_x + 1, last_y) in self.snake_coords:
                 return 'game_over'
             self.snake_coords.append((last_x + 1, last_y))
         elif self.direction == 'left':
@@ -166,16 +179,20 @@ class Snake:
 
 
 class Apple(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, scaled=True):
         super().__init__(all_sprites)
         self.pos_x = x
         self.pos_y = y
-        image = apple_image[0]
-        scaled_image = pygame.transform.scale(image, (
-            int(image.get_width() / 50 * 25), int(image.get_height() / 50 * 25)))
-        self.image = scaled_image
-        self.rect = self.image.get_rect().move(
-            TILE_SIZE * x, TILE_SIZE * y)
+        image = other_images['apple']
+        if scaled:
+            scaled_image = pygame.transform.scale(image, (
+                int(image.get_width() / 50 * 25), int(image.get_height() / 50 * 25)))
+            self.image = scaled_image
+            self.rect = self.image.get_rect().move(
+                TILE_SIZE * x, TILE_SIZE * y)
+        else:
+            self.image = image
+            self.rect = self.image.get_rect().move(x * 50, y * 50)
 
 
 class GameOver(pygame.sprite.Sprite):
@@ -211,10 +228,14 @@ def start_screen_1(screen, clock):
                 terminate()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
-                if 125 <= x < 630 and 250 <= y <= 400:
-                    return 'play'
-                elif 125 <= x <= 630 and 430 <= y <= 580:
-                    return 'stats'
+                if 125 <= x <= 630:
+                    if 250 <= y <= 400:
+                        return 'play'
+                    elif 430 <= y <= 580:
+                        return 'stats'
+                    elif 610 <= y <= 760:
+                        return 'settings'
+
         pygame.display.flip()
         clock.tick(START_SCREENS_FPS)
 
@@ -235,6 +256,10 @@ def start_screen_2(screen, clock):
                         return 'normal'
                     elif 590 <= y <= 690:
                         return 'hard'
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    reset_sprites()
+                    return 'escape'  # выход на главный экран
         pygame.display.flip()
         clock.tick(START_SCREENS_FPS)
 
@@ -276,14 +301,14 @@ def start_screen_3(screen, clock, difficulty):
                 terminate()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
-                if 0 <= x <= 50 and 270 <= y <= 430:
+                if 0 <= x <= 50 and 270 + abs(x - 50) <= y <= 430 - abs(x - 50):
                     if curlevel != 0:
                         curlevel -= 1
                     else:
                         curlevel = 9
                     level = load_level(f'level{first_num}_{curlevel}.txt')
                     intro_rect = draw_number(curlevel + 1, intro_rect)
-                elif 700 <= x <= 750 and 270 <= y <= 430:
+                elif 700 <= x <= 750 and 270 + abs(x - 700) <= y <= 430 - abs(x - 700):
                     if curlevel != 9:
                         curlevel += 1
                     else:
@@ -294,6 +319,10 @@ def start_screen_3(screen, clock, difficulty):
                     # здесь задаются начальные координаты змейки
                     snake_coords = [(0, 0), (1, 0)]
                     return level, curlevel + 1, snake_coords
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    reset_sprites()
+                    return 'escape', 0, 0  # выход на главный экран
         generate_scheme(level)
         mini_tiles_group.draw(screen)
         pygame.display.flip()
@@ -368,13 +397,30 @@ def create_apple(level, snake):
 
 
 def draw_score(number, screen):
-    font = pygame.font.Font('data/segoeprint.ttf', 35)
+    font = pygame.font.Font('data/segoeprint.ttf', 28)
     string_rendered = font.render(f'Очки: {number}', 1, (255, 106, 0))
     intro_rect = string_rendered.get_rect()
-    text_coord_x = 520
-    text_coord_y = 745
-    intro_rect.top = text_coord_y
-    intro_rect.x = text_coord_x
+    intro_rect.top = 755
+    intro_rect.x = 575
+    screen.blit(string_rendered, intro_rect)
+
+
+def draw_record(difficulty, level_num, screen):
+    if difficulty == 'easy':
+        difficulty_num = '1'
+    elif difficulty == 'normal':
+        difficulty_num = '2'
+    elif difficulty == 'hard':
+        difficulty_num = '3'
+    with open('stats.txt', 'r', encoding='UTF-8') as file:
+        lines = file.readlines()
+    line_number = level_num + int(difficulty_num) - 1 + (int(difficulty_num) - 1) * 10
+    number = int(lines[line_number].rstrip().split(':')[1][1:])
+    font = pygame.font.Font('data/segoeprint.ttf', 20)
+    string_rendered = font.render(f'Рекорд: {number}', 1, (255, 106, 0))
+    intro_rect = string_rendered.get_rect()
+    intro_rect.top = 740
+    intro_rect.x = 575
     screen.blit(string_rendered, intro_rect)
 
 
@@ -382,12 +428,12 @@ def draw_hints(screen):
     font = pygame.font.Font('data/segoeprint.ttf', 20)
     string_rendered = font.render(f"Нажмите 'p', чтобы переиграть", 1, (255, 106, 0))
     intro_rect = string_rendered.get_rect()
-    intro_rect.top = 735
+    intro_rect.top = 738
     intro_rect.x = 0
     screen.blit(string_rendered, intro_rect)
     string_rendered = font.render(f"Нажмите 'ESC', чтобы выйти на главный экран", 1, (255, 106, 0))
     intro_rect = string_rendered.get_rect()
-    intro_rect.top = 760
+    intro_rect.top = 762
     intro_rect.x = 0
     screen.blit(string_rendered, intro_rect)
 
@@ -423,11 +469,12 @@ def stats_screen(screen, clock):
     hard = intro_text[22:33]
 
     font = pygame.font.Font('data/segoeprint.ttf', 20)
+    stats_color = (255, 106, 0)
 
-    def draw(x, start_y, text_list):
+    def draw(x, start_y, text_list, color):
         text_coord = start_y
         for line in text_list:
-            string_rendered = font.render(line, 1, (255, 106, 0))
+            string_rendered = font.render(line, 1, color)
             intro_rect = string_rendered.get_rect()
             text_coord += 1
             intro_rect.top = text_coord
@@ -435,17 +482,104 @@ def stats_screen(screen, clock):
             text_coord += intro_rect.height
             screen.blit(string_rendered, intro_rect)
 
-    draw(10, 0, easy)
-    draw(400, 0, normal)
-    draw(200, 400, hard)
+    draw(10, 0, easy, stats_color)
+    draw(400, 0, normal, stats_color)
+    draw(200, 400, hard, stats_color)
+    draw(425, 760, ['Нажмите ESC, чтобы выйти'], (255, 255, 0))
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
             elif event.type == pygame.KEYDOWN:
-                return  # начинаем игру
+                if event.key == pygame.K_ESCAPE:
+                    reset_sprites()
+                    return  # выход на главный экран
         pygame.display.flip()
+        clock.tick(START_SCREENS_FPS)
+
+
+def settings_screen(screen, clock):
+    fon = pygame.transform.scale(load_image('settings_screen.jpg'), (WIDTH, HEIGHT))
+    screen.blit(fon, (0, 0))
+    current_sprite_sheet = 0
+    current_empty_image = 0
+    current_apple_image = 0
+    current_wall_image = 0
+
+    def load_sprites(current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image):
+        cut_sheet(load_image(sprites_sheets[current_sprite_sheet]), 5, 4)
+        other_images['empty'] = load_image(empty_images[current_empty_image])
+        other_images['apple'] = load_image(apple_images[current_apple_image])
+        other_images['wall'] = load_image(wall_images[current_wall_image])
+
+    def draw_sprites():
+        SnakePart('end_left', 1, 2, scaled=False)
+        SnakePart('horizontal', 2, 2, scaled=False)
+        SnakePart('head_right', 3, 2, scaled=False)
+        Tile('empty', 2, 6, scaled=False)
+        Apple(2, 9, scaled=False)
+        Tile('wall', 2, 12, scaled=False)
+        all_sprites.draw(screen)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = event.pos
+                if 400 <= x <= 550:
+                    if 25 <= y <= 80:
+                        if current_sprite_sheet == 0:
+                            current_sprite_sheet = len(sprites_sheets) - 1
+                        else:
+                            current_sprite_sheet -= 1
+                    elif 190 <= y <= 245:
+                        if current_empty_image == 0:
+                            current_empty_image = len(empty_images) - 1
+                        else:
+                            current_empty_image -= 1
+                    elif 360 <= y <= 420:
+                        if current_apple_image == 0:
+                            current_apple_image = len(apple_images) - 1
+                        else:
+                            current_apple_image -= 1
+                    elif 530 <= y <= 580:
+                        if current_wall_image == 0:
+                            current_wall_image = len(wall_images) - 1
+                        else:
+                            current_wall_image -= 1
+                elif 565 <= x <= 710:
+                    if 25 <= y <= 80:
+                        if current_sprite_sheet == len(sprites_sheets) - 1:
+                            current_sprite_sheet = 0
+                        else:
+                            current_sprite_sheet += 1
+                    elif 190 <= y <= 245:
+                        if current_empty_image == len(empty_images) - 1:
+                            current_empty_image = 0
+                        else:
+                            current_empty_image += 1
+                    elif 360 <= y <= 420:
+                        if current_apple_image == len(apple_images) - 1:
+                            current_apple_image = 0
+                        else:
+                            current_apple_image += 1
+                    elif 530 <= y <= 580:
+                        if current_wall_image == len(wall_images) - 1:
+                            current_wall_image = 0
+                        else:
+                            current_wall_image += 1
+                if 500 <= x <= 700 and 700 <= y <= 780:
+                    current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image = 0, 0, 0, 0
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    reset_sprites()
+                    return  # выход на главный экран
+        pygame.display.flip()
+        reset_sprites()
+        load_sprites(current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image)
+        draw_sprites()
         clock.tick(START_SCREENS_FPS)
 
 
@@ -455,9 +589,13 @@ def play():
     screen.fill((0, 0, 0))
     pygame.display.set_caption('Twisty Zapper')
     clock = pygame.time.Clock()
+    fps = 60
     mode = start_screen_1(screen, clock)
     if mode == 'play':
         difficulty = start_screen_2(screen, clock)  # от сложности зависит fps
+        if difficulty == 'escape':
+            reset_sprites()
+            return True  # конец функции play
         if difficulty == 'easy':
             fps = 6
         elif difficulty == 'normal':
@@ -465,6 +603,8 @@ def play():
         elif difficulty == 'hard':
             fps = 15
         start_level, level_num, start_snake_coords = start_screen_3(screen, clock, difficulty)
+        if start_level == 'escape':
+            return True  # конец функции play
         level = [i[:] for i in start_level[:]]
         for spr in mini_tiles_group:
             spr.kill()
@@ -490,7 +630,7 @@ def play():
                             direction = 'up'
                         elif event.key == pygame.K_DOWN:
                             direction = 'down'
-                    elif event.key == pygame.K_p:
+                    if event.key == pygame.K_p:
                         screen.fill((0, 0, 0))
                         snake_alive = True
                         game_over_flag = False
@@ -498,7 +638,7 @@ def play():
                         level = [i[:] for i in start_level[:]]
                         snake = Snake(start_snake_coords[:])
                         create_apple(level, snake)
-                    elif event.key == pygame.K_ESCAPE:
+                    if event.key == pygame.K_ESCAPE:
                         reset_sprites()
                         return True  # конец функции play
             snake.change_direction(direction)
@@ -519,12 +659,18 @@ def play():
                 draw_hints(screen)
             draw_score(snake.score, screen)
             update_stats(difficulty, level_num, snake.score)
+            draw_record(difficulty, level_num, screen)
             pygame.display.flip()
             for spr in all_sprites:
                 spr.kill()
     elif mode == 'stats':
         screen.fill((0, 0, 0))
         stats_screen(screen, clock)
+        reset_sprites()
+        return True  # конец функции play
+    elif mode == 'settings':
+        screen.fill((0, 0, 0))
+        settings_screen(screen, clock)
         reset_sprites()
         return True  # конец функции play
 
