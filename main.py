@@ -1,12 +1,15 @@
 import os
+import random
 import sys
 
 import pygame
-import random
+
+pygame.mixer.init()
 
 WIDTH, HEIGHT = 750, 800  # размеры окна
 TILE_SIZE = 25  # размер игровой плитки
 START_SCREENS_FPS = 10
+music_menu_flag = True
 
 all_sprites = pygame.sprite.Group()
 mini_tiles_group = pygame.sprite.Group()
@@ -15,10 +18,59 @@ snake_group = pygame.sprite.Group()
 game_over_group = pygame.sprite.Group()
 settings_group = pygame.sprite.Group()
 
+particle_group = pygame.sprite.Group()
+
 
 def terminate():
     pygame.quit()
     sys.exit()
+
+
+def load_sound(name):
+    fullname = os.path.join('data', 'sounds', name)
+    if not os.path.isfile(fullname):
+        print(f"Файл с изображением '{fullname}' не найден")
+        sys.exit()
+    sound = pygame.mixer.Sound(fullname)
+    return sound
+
+
+def start_musick(name, volum):
+    fullname = os.path.join('data', 'sounds', name)
+    if not os.path.isfile(fullname):
+        print(f"Файл с изображением '{fullname}' не найден")
+        sys.exit()
+    pygame.mixer.music.load(fullname)
+    pygame.mixer.music.play(-1)
+    pygame.mixer.music.set_volume(volum)
+
+
+def menu_music(name, vol, f):
+    if f:
+        start_musick(name, vol)
+
+
+def click_sound():
+    load_sound('klick.mp3').play()
+
+
+def spawn_particles_on_eat(x, y):
+    # if other_images['apple'] == load_image('apple2.png'):
+    #     colour = (230, 0, 0)
+    # else:
+    #     colour = (255, 105, 180)
+    colour = (240, 0, 0)
+    for _ in range(10):  # 10 частиц за раз
+        particle = Particle(x, y, colour)
+        particle_group.add(particle)
+
+
+# Функция для создания частиц при ударе об стену
+def spawn_particles_on_wall_collision(x, y):
+    colour = (0, 0, 0)
+    for _ in range(20):  # Больше частиц при ударе о стену
+        particle = Particle(x, y, colour)
+        particle_group.add(particle)
 
 
 def load_image(name, colorkey=None):
@@ -89,6 +141,26 @@ def reset_sprites():
         spr.kill()
     for spr in game_over_group:
         spr.kill()
+
+
+class Particle(pygame.sprite.Sprite):
+    def __init__(self, x, y, colour):
+        super().__init__()
+        part_side = random.randint(3, 9)
+        self.image = pygame.Surface((part_side, part_side))
+        self.image.fill(colour)
+        self.rect = self.image.get_rect(center=(x + 12, y + 12))
+        self.lifetime = random.randint(5, 15)
+        self.vel_x = random.uniform(-1, 2)
+        self.vel_y = random.uniform(-1, 2)
+
+    def update(self):
+        self.rect.x += self.vel_x
+        self.rect.y += self.vel_y
+        self.lifetime -= 1
+
+        if self.lifetime <= 0:
+            self.kill()  # Удаляем спрайт, когда его время жизни заканчивается
 
 
 class MiniTile(pygame.sprite.Sprite):
@@ -175,6 +247,8 @@ class Snake:
             self.score += 1
             level[new_last_y][new_last_x] = '.'
             create_apple(level, self)
+            spawn_particles_on_eat(new_last_x * 25, new_last_y * 25)
+            load_sound('eat_food.mp3').play()
         return 'continue'
 
 
@@ -230,10 +304,13 @@ def start_screen_1(screen, clock):
                 x, y = event.pos
                 if 125 <= x <= 630:
                     if 250 <= y <= 400:
+                        click_sound()
                         return 'play'
                     elif 430 <= y <= 580:
+                        click_sound()
                         return 'stats'
                     elif 610 <= y <= 760:
+                        click_sound()
                         return 'settings'
 
         pygame.display.flip()
@@ -251,10 +328,13 @@ def start_screen_2(screen, clock):
                 x, y = event.pos
                 if 190 <= x <= 560:
                     if 270 <= y <= 370:
+                        click_sound()
                         return 'easy'
                     elif 430 <= y <= 530:
+                        click_sound()
                         return 'normal'
                     elif 590 <= y <= 690:
+                        click_sound()
                         return 'hard'
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -308,6 +388,7 @@ def start_screen_3(screen, clock, difficulty):
                         curlevel = 9
                     level = load_level(f'level{first_num}_{curlevel}.txt')
                     intro_rect = draw_number(curlevel + 1, intro_rect)
+                    click_sound()
                 elif 700 <= x <= 750 and 270 + abs(x - 700) <= y <= 430 - abs(x - 700):
                     if curlevel != 9:
                         curlevel += 1
@@ -315,9 +396,11 @@ def start_screen_3(screen, clock, difficulty):
                         curlevel = 0
                     level = load_level(f'level{first_num}_{curlevel}.txt')
                     intro_rect = draw_number(curlevel + 1, intro_rect)
+                    click_sound()
                 elif 190 <= x <= 570 and 700 <= y <= 780:
                     # здесь задаются начальные координаты змейки
                     snake_coords = [(0, 0), (1, 0)]
+                    click_sound()
                     return level, curlevel + 1, snake_coords
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -534,43 +617,52 @@ def settings_screen(screen, clock):
                             current_sprite_sheet = len(sprites_sheets) - 1
                         else:
                             current_sprite_sheet -= 1
+                        click_sound()
                     elif 190 <= y <= 245:
                         if current_empty_image == 0:
                             current_empty_image = len(empty_images) - 1
                         else:
                             current_empty_image -= 1
+                        click_sound()
                     elif 360 <= y <= 420:
                         if current_apple_image == 0:
                             current_apple_image = len(apple_images) - 1
                         else:
                             current_apple_image -= 1
+                        click_sound()
                     elif 530 <= y <= 580:
                         if current_wall_image == 0:
                             current_wall_image = len(wall_images) - 1
                         else:
                             current_wall_image -= 1
+                        click_sound()
                 elif 565 <= x <= 710:
                     if 25 <= y <= 80:
                         if current_sprite_sheet == len(sprites_sheets) - 1:
                             current_sprite_sheet = 0
                         else:
                             current_sprite_sheet += 1
+                        click_sound()
                     elif 190 <= y <= 245:
                         if current_empty_image == len(empty_images) - 1:
                             current_empty_image = 0
                         else:
                             current_empty_image += 1
+                        click_sound()
                     elif 360 <= y <= 420:
                         if current_apple_image == len(apple_images) - 1:
                             current_apple_image = 0
                         else:
                             current_apple_image += 1
+                        click_sound()
                     elif 530 <= y <= 580:
                         if current_wall_image == len(wall_images) - 1:
                             current_wall_image = 0
                         else:
                             current_wall_image += 1
+                        click_sound()
                 if 500 <= x <= 700 and 700 <= y <= 780:
+                    click_sound()
                     current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image = 0, 0, 0, 0
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -584,12 +676,15 @@ def settings_screen(screen, clock):
 
 
 def play():
+    global music_menu_flag
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     screen.fill((0, 0, 0))
     pygame.display.set_caption('Twisty Zapper')
     clock = pygame.time.Clock()
     fps = 60
+    menu_music('menu_music.mp3', 0.1, music_menu_flag)
+    music_menu_flag = False
     mode = start_screen_1(screen, clock)
     if mode == 'play':
         difficulty = start_screen_2(screen, clock)  # от сложности зависит fps
@@ -615,6 +710,7 @@ def play():
         snake_alive = True
         game_over_flag = False
         pygame.init()
+        start_musick('game_music.wav', 0.1)
         while running:
             clock.tick(fps)
             for event in pygame.event.get():
@@ -639,8 +735,11 @@ def play():
                         level = [i[:] for i in start_level[:]]
                         snake = Snake(start_snake_coords[:])
                         create_apple(level, snake)
+                        start_musick('game_music.wav', 0.1)
                     if event.key == pygame.K_ESCAPE:
                         reset_sprites()
+                        pygame.mixer.music.stop()
+                        music_menu_flag = True
                         return True  # конец функции play
             snake.change_direction(direction)
             screen.fill((0, 0, 0))
@@ -652,9 +751,14 @@ def play():
             if not snake_alive:
                 if not game_over_flag:
                     GameOver()
+                    pygame.mixer.music.stop()
+                    load_sound('game_over.mp3').play()
                     game_over_flag = True
             game_over_group.update()
+            particle_group.update()
+            # Рисование всех спрайтов
             all_sprites.draw(screen)
+            particle_group.draw(screen)
             game_over_group.draw(screen)
             if game_over_flag:
                 draw_hints(screen)
