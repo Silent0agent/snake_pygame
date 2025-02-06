@@ -4,21 +4,23 @@ import sys
 
 import pygame
 
-pygame.mixer.init()
-
 WIDTH, HEIGHT = 750, 800  # размеры окна
 TILE_SIZE = 25  # размер игровой плитки
+MINI_TILE_SIZE = 15  # размер плитки схемы уровня
 START_SCREENS_FPS = 10
+
 music_menu_flag = True
 
 all_sprites = pygame.sprite.Group()
 mini_tiles_group = pygame.sprite.Group()
 tiles_group = pygame.sprite.Group()
 snake_group = pygame.sprite.Group()
-game_over_group = pygame.sprite.Group()
-settings_group = pygame.sprite.Group()
+horizontal_borders_group = pygame.sprite.Group()
+vertical_borders_group = pygame.sprite.Group()
 
+# Следующие группы не относятся к all_sprites
 particle_group = pygame.sprite.Group()
+game_over_group = pygame.sprite.Group()
 
 
 def terminate():
@@ -35,41 +37,37 @@ def load_sound(name):
     return sound
 
 
-def start_musick(name, volum):
+def start_music(name, volume):
     fullname = os.path.join('data', 'sounds', name)
     if not os.path.isfile(fullname):
         print(f"Файл с изображением '{fullname}' не найден")
         sys.exit()
     pygame.mixer.music.load(fullname)
     pygame.mixer.music.play(-1)
-    pygame.mixer.music.set_volume(volum)
+    pygame.mixer.music.set_volume(volume)
 
 
-def menu_music(name, vol, f):
-    if f:
-        start_musick(name, vol)
+def menu_music(name, vol, flag):
+    if flag:
+        start_music(name, vol)
 
 
 def click_sound():
-    load_sound('klick.mp3').play()
+    load_sound('click.mp3').play()
 
 
 def spawn_particles_on_eat(x, y):
-    # if other_images['apple'] == load_image('apple2.png'):
-    #     colour = (230, 0, 0)
-    # else:
-    #     colour = (255, 105, 180)
-    colour = (240, 0, 0)
+    color = (240, 0, 0)
     for _ in range(10):  # 10 частиц за раз
-        particle = Particle(x, y, colour)
+        particle = Particle(x, y, color)
         particle_group.add(particle)
 
 
 # Функция для создания частиц при ударе об стену
 def spawn_particles_on_wall_collision(x, y):
-    colour = (0, 0, 0)
+    color = (0, 0, 0)
     for _ in range(20):  # Больше частиц при ударе о стену
-        particle = Particle(x, y, colour)
+        particle = Particle(x, y, color)
         particle_group.add(particle)
 
 
@@ -141,14 +139,30 @@ def reset_sprites():
         spr.kill()
     for spr in game_over_group:
         spr.kill()
+    for spr in particle_group:
+        spr.kill()
+
+
+class Border(pygame.sprite.Sprite):  # класс Border используется, чтобы частицы не выходили за экран (критерий collide)
+    # строго вертикальный или строго горизонтальный отрезок
+    def __init__(self, x1, y1, x2, y2):
+        super().__init__(all_sprites)
+        if x1 == x2:  # вертикальная стенка
+            self.add(vertical_borders_group)
+            self.image = pygame.Surface([1, y2 - y1])
+            self.rect = pygame.Rect(x1, y1, 1, y2 - y1)
+        else:  # горизонтальная стенка
+            self.add(horizontal_borders_group)
+            self.image = pygame.Surface([x2 - x1, 1])
+            self.rect = pygame.Rect(x1, y1, x2 - x1, 1)
 
 
 class Particle(pygame.sprite.Sprite):
-    def __init__(self, x, y, colour):
-        super().__init__()
+    def __init__(self, x, y, color):
+        super().__init__(particle_group)
         part_side = random.randint(3, 9)
         self.image = pygame.Surface((part_side, part_side))
-        self.image.fill(colour)
+        self.image.fill(color)
         self.rect = self.image.get_rect(center=(x + 12, y + 12))
         self.lifetime = random.randint(5, 15)
         self.vel_x = random.uniform(-1, 2)
@@ -161,6 +175,9 @@ class Particle(pygame.sprite.Sprite):
 
         if self.lifetime <= 0:
             self.kill()  # Удаляем спрайт, когда его время жизни заканчивается
+        elif (pygame.sprite.spritecollideany(self, vertical_borders_group) or
+              pygame.sprite.spritecollideany(self, horizontal_borders_group)):
+            self.kill()  # Удаляем спрайт, если он заходит за пределы игрового поля
 
 
 class MiniTile(pygame.sprite.Sprite):
@@ -168,10 +185,10 @@ class MiniTile(pygame.sprite.Sprite):
         super().__init__(mini_tiles_group, all_sprites)
         tile_image = other_images[tile_type]
         scaled_image = pygame.transform.scale(tile_image, (
-            int(tile_image.get_width() / 50 * 15), int(tile_image.get_height() / 50 * 15)))
+            int(tile_image.get_width() / 50 * MINI_TILE_SIZE), int(tile_image.get_height() / 50 * MINI_TILE_SIZE)))
         self.image = scaled_image
         self.rect = self.image.get_rect().move(
-            150 + 15 * pos_x, 125 + 15 * pos_y)
+            150 + MINI_TILE_SIZE * pos_x, 125 + MINI_TILE_SIZE * pos_y)
 
 
 class Tile(pygame.sprite.Sprite):
@@ -180,7 +197,7 @@ class Tile(pygame.sprite.Sprite):
         tile_image = other_images[tile_type]
         if scaled:
             scaled_image = pygame.transform.scale(tile_image, (
-                int(tile_image.get_width() / 50 * 25), int(tile_image.get_height() / 50 * 25)))
+                int(tile_image.get_width() / 50 * TILE_SIZE), int(tile_image.get_height() / 50 * TILE_SIZE)))
             self.image = scaled_image
             self.rect = self.image.get_rect().move(
                 TILE_SIZE * x, TILE_SIZE * y)
@@ -197,7 +214,7 @@ class SnakePart(pygame.sprite.Sprite):
         snake_image = snake_images[type]
         if scaled:
             scaled_image = pygame.transform.scale(snake_image, (
-                int(snake_image.get_width() / 50 * 25), int(snake_image.get_height() / 50 * 25)))
+                int(snake_image.get_width() / 50 * TILE_SIZE), int(snake_image.get_height() / 50 * TILE_SIZE)))
             self.image = scaled_image
             self.rect = self.image.get_rect().move(
                 TILE_SIZE * x, TILE_SIZE * y)
@@ -247,7 +264,7 @@ class Snake:
             self.score += 1
             level[new_last_y][new_last_x] = '.'
             create_apple(level, self)
-            spawn_particles_on_eat(new_last_x * 25, new_last_y * 25)
+            spawn_particles_on_eat(new_last_x * TILE_SIZE, new_last_y * TILE_SIZE)
             load_sound('eat_food.mp3').play()
         return 'continue'
 
@@ -260,7 +277,7 @@ class Apple(pygame.sprite.Sprite):
         image = other_images['apple']
         if scaled:
             scaled_image = pygame.transform.scale(image, (
-                int(image.get_width() / 50 * 25), int(image.get_height() / 50 * 25)))
+                int(image.get_width() / 50 * TILE_SIZE), int(image.get_height() / 50 * TILE_SIZE)))
             self.image = scaled_image
             self.rect = self.image.get_rect().move(
                 TILE_SIZE * x, TILE_SIZE * y)
@@ -413,6 +430,10 @@ def start_screen_3(screen, clock, difficulty):
 
 
 def generate_level(level, snake):
+    Border(0, 0, 0, HEIGHT - 50)
+    Border(WIDTH, 0, WIDTH, HEIGHT - 50)
+    Border(0, 0, WIDTH, 0)
+    Border(0, HEIGHT - 50, WIDTH, HEIGHT - 50)
     for y in range(len(level)):
         for x in range(len(level[0])):
             if level[y][x] == '.':
@@ -489,6 +510,7 @@ def draw_score(number, screen):
 
 
 def draw_record(difficulty, level_num, screen):
+    difficulty_num = '1'
     if difficulty == 'easy':
         difficulty_num = '1'
     elif difficulty == 'normal':
@@ -507,21 +529,37 @@ def draw_record(difficulty, level_num, screen):
     screen.blit(string_rendered, intro_rect)
 
 
-def draw_hints(screen):
+def draw_pause_hints(screen, pause_flag):
     font = pygame.font.Font('data/segoeprint.ttf', 20)
-    string_rendered = font.render(f"Нажмите 'p', чтобы переиграть", 1, (255, 106, 0))
+    if not pause_flag:
+        string_rendered = font.render(f"Нажмите 'p' для паузы", 1, (255, 106, 0))
+    else:
+        string_rendered = font.render(f"ПАУЗА", 1, (255, 106, 0))
     intro_rect = string_rendered.get_rect()
-    intro_rect.top = 738
+    intro_rect.top = 740
+    if not pause_flag:
+        intro_rect.x = 0
+    else:
+        intro_rect.x = 350
+    screen.blit(string_rendered, intro_rect)
+
+
+def draw_game_over_hints(screen):
+    font = pygame.font.Font('data/segoeprint.ttf', 20)
+    string_rendered = font.render(f"Нажмите 'r', чтобы переиграть", 1, (255, 106, 0))
+    intro_rect = string_rendered.get_rect()
+    intro_rect.top = 740
     intro_rect.x = 0
     screen.blit(string_rendered, intro_rect)
     string_rendered = font.render(f"Нажмите 'ESC', чтобы выйти на главный экран", 1, (255, 106, 0))
     intro_rect = string_rendered.get_rect()
-    intro_rect.top = 762
+    intro_rect.top = 764
     intro_rect.x = 0
     screen.blit(string_rendered, intro_rect)
 
 
 def update_stats(difficulty, level_num, score):
+    difficulty_num = '1'
     if difficulty == 'easy':
         difficulty_num = '1'
     elif difficulty == 'normal':
@@ -678,6 +716,7 @@ def settings_screen(screen, clock):
 def play():
     global music_menu_flag
     pygame.init()
+    pygame.mixer.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     screen.fill((0, 0, 0))
     pygame.display.set_caption('Twisty Zapper')
@@ -685,6 +724,8 @@ def play():
     fps = 60
     menu_music('menu_music.mp3', 0.1, music_menu_flag)
     music_menu_flag = False
+    pause_flag = False
+    ongoing = 'continue'
     mode = start_screen_1(screen, clock)
     if mode == 'play':
         difficulty = start_screen_2(screen, clock)  # от сложности зависит fps
@@ -694,9 +735,9 @@ def play():
         if difficulty == 'easy':
             fps = 6
         elif difficulty == 'normal':
-            fps = 10
+            fps = 9
         elif difficulty == 'hard':
-            fps = 15
+            fps = 14
         start_level, level_num, start_snake_coords = start_screen_3(screen, clock, difficulty)
         if start_level == 'escape':
             return True  # конец функции play
@@ -709,8 +750,7 @@ def play():
         running = True
         snake_alive = True
         game_over_flag = False
-        pygame.init()
-        start_musick('game_music.wav', 0.1)
+        start_music('game_music.wav', 0.1)
         while running:
             clock.tick(fps)
             for event in pygame.event.get():
@@ -726,48 +766,65 @@ def play():
                             direction = 'up'
                         elif event.key == pygame.K_DOWN:
                             direction = 'down'
-                    if event.key == pygame.K_p:
-                        screen.fill((0, 0, 0))
+                    if event.key == pygame.K_r:
+                        # перезапуск уровня
                         snake_alive = True
                         game_over_flag = False
+                        pause_flag = False
                         reset_sprites()
                         direction = 'right'
                         level = [i[:] for i in start_level[:]]
                         snake = Snake(start_snake_coords[:])
                         create_apple(level, snake)
-                        start_musick('game_music.wav', 0.1)
-                    if event.key == pygame.K_ESCAPE:
+                        start_music('game_music.wav', 0.1)
+                    elif event.key == pygame.K_p:
+                        # пауза
+                        if snake_alive:
+                            if not pause_flag:
+                                pause_flag = True
+                                draw_pause_hints(screen, pause_flag)
+                            else:
+                                pause_flag = False
+                    elif event.key == pygame.K_ESCAPE:
+                        # выход на главный экран
                         reset_sprites()
                         pygame.mixer.music.stop()
                         music_menu_flag = True
                         return True  # конец функции play
-            snake.change_direction(direction)
-            screen.fill((0, 0, 0))
-            generate_level(level, snake)
-            if snake_alive:
-                ongoing = snake.move(level)
-            if ongoing == 'game_over':
-                snake_alive = False
-            if not snake_alive:
-                if not game_over_flag:
-                    GameOver()
-                    pygame.mixer.music.stop()
-                    load_sound('game_over.mp3').play()
-                    game_over_flag = True
-            game_over_group.update()
-            particle_group.update()
-            # Рисование всех спрайтов
-            all_sprites.draw(screen)
-            particle_group.draw(screen)
-            game_over_group.draw(screen)
-            if game_over_flag:
-                draw_hints(screen)
-            draw_score(snake.score, screen)
-            update_stats(difficulty, level_num, snake.score)
-            draw_record(difficulty, level_num, screen)
-            pygame.display.flip()
-            for spr in all_sprites:
-                spr.kill()
+
+            if not pause_flag:
+                snake.change_direction(direction)
+                screen.fill((0, 0, 0))
+                generate_level(level, snake)
+                if snake_alive:
+                    ongoing = snake.move(level)
+                if ongoing == 'game_over':
+                    snake_alive = False
+                if not snake_alive:
+                    if not game_over_flag:
+                        GameOver()
+                        pygame.mixer.music.stop()
+                        load_sound('game_over.mp3').play()
+                        game_over_flag = True
+                game_over_group.update()
+                particle_group.update()
+                # Рисование всех спрайтов
+                all_sprites.draw(screen)
+                particle_group.draw(screen)
+                game_over_group.draw(screen)
+                if game_over_flag:
+                    draw_game_over_hints(screen)
+                else:
+                    draw_pause_hints(screen, pause_flag)
+                draw_score(snake.score, screen)
+                update_stats(difficulty, level_num, snake.score)
+                draw_record(difficulty, level_num, screen)
+                pygame.display.flip()
+                for spr in all_sprites:
+                    spr.kill()
+            else:
+                draw_pause_hints(screen, pause_flag)
+                pygame.display.flip()
     elif mode == 'stats':
         screen.fill((0, 0, 0))
         stats_screen(screen, clock)
