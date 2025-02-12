@@ -7,7 +7,7 @@ import pygame
 WIDTH, HEIGHT = 750, 800  # размеры окна
 TILE_SIZE = 25  # размер игровой плитки
 MINI_TILE_SIZE = 15  # размер плитки схемы уровня
-START_SCREENS_FPS = 10
+START_SCREENS_FPS = 10  # fps на начальных экранах
 
 music_menu_flag = True
 
@@ -21,6 +21,7 @@ vertical_borders_group = pygame.sprite.Group()
 # Следующие группы не относятся к all_sprites
 particle_group = pygame.sprite.Group()
 game_over_group = pygame.sprite.Group()
+animated_group = pygame.sprite.Group()
 
 
 def terminate():
@@ -221,6 +222,19 @@ class SnakePart(pygame.sprite.Sprite):
         else:
             self.image = snake_image
             self.rect = self.image.get_rect().move(x * 50, y * 50)
+
+
+class AnimatedSnakeShowcase(pygame.sprite.Sprite):  # критерий анимация
+    def __init__(self, x, y):
+        super().__init__(animated_group)
+        self.frames = list(snake_images.values())
+        self.cur_frame = 0
+        self.image = self.frames[self.cur_frame]
+        self.rect = self.image.get_rect().move(x * 50, y * 50)
+
+    def update(self):
+        self.cur_frame = (self.cur_frame + 1) % len(self.frames)
+        self.image = self.frames[self.cur_frame]
 
 
 class Snake:
@@ -675,6 +689,7 @@ def settings_screen(screen, clock):
     current_empty_image = 0
     current_apple_image = 0
     current_wall_image = 0
+    snake_changed_flag = True
 
     def load_sprites(current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image):
         cut_sheet(load_image(sprites_sheets[current_sprite_sheet]), 5, 4)
@@ -690,6 +705,13 @@ def settings_screen(screen, clock):
         Apple(2, 9, scaled=False)
         Tile('wall', 2, 12, scaled=False)
         all_sprites.draw(screen)
+        if snake_changed_flag:
+            for spr in animated_group:
+                spr.kill()
+            AnimatedSnakeShowcase(10.5, 2)
+        else:
+            animated_group.update()
+        animated_group.draw(screen)
 
     while True:
         for event in pygame.event.get():
@@ -703,6 +725,7 @@ def settings_screen(screen, clock):
                             current_sprite_sheet = len(sprites_sheets) - 1
                         else:
                             current_sprite_sheet -= 1
+                        snake_changed_flag = True
                         click_sound()
                     elif 190 <= y <= 245:
                         if current_empty_image == 0:
@@ -728,6 +751,7 @@ def settings_screen(screen, clock):
                             current_sprite_sheet = 0
                         else:
                             current_sprite_sheet += 1
+                        snake_changed_flag = True
                         click_sound()
                     elif 190 <= y <= 245:
                         if current_empty_image == len(empty_images) - 1:
@@ -756,8 +780,11 @@ def settings_screen(screen, clock):
                     return  # выход на главный экран
         pygame.display.flip()
         reset_sprites()
+        screen.fill((0, 0, 0))
+        screen.blit(fon, (0, 0))
         load_sprites(current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image)
         draw_sprites()
+        snake_changed_flag = False
         clock.tick(START_SCREENS_FPS)
 
 
@@ -882,6 +909,8 @@ def play():
         screen.fill((0, 0, 0))
         settings_screen(screen, clock)
         reset_sprites()
+        for spr in animated_group:
+            spr.kill()
         return True  # конец функции play
 
 
