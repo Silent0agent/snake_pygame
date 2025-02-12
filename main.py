@@ -239,33 +239,59 @@ class Snake:
 
     def move(self, level):
         last_x, last_y = self.snake_coords[-1][0], self.snake_coords[-1][1]
+        max_x_y = len(level) - 1
         if self.direction == 'right':
-            if last_x + 1 > len(level) - 1 or level[last_y][last_x + 1] == '#' or (
+            if last_x + 1 > max_x_y:
+                if level[last_y][0] == '#' or (0, last_y) in self.snake_coords:
+                    return 'game_over'
+                else:
+                    self.snake_coords.append((0, last_y))
+            elif level[last_y][last_x + 1] == '#' or (
                     last_x + 1, last_y) in self.snake_coords:
                 return 'game_over'
-            self.snake_coords.append((last_x + 1, last_y))
+            else:
+                self.snake_coords.append((last_x + 1, last_y))
         elif self.direction == 'left':
-            if last_x - 1 < 0 or level[last_y][last_x - 1] == '#' or (last_x - 1, last_y) in self.snake_coords:
+            if last_x - 1 < 0:
+                if level[last_y][max_x_y] == '#' or (max_x_y, last_y) in self.snake_coords:
+                    return 'game_over'
+                else:
+                    self.snake_coords.append((max_x_y, last_y))
+            elif level[last_y][last_x - 1] == '#' or (last_x - 1, last_y) in self.snake_coords:
                 return 'game_over'
-            self.snake_coords.append((last_x - 1, last_y))
+            else:
+                self.snake_coords.append((last_x - 1, last_y))
         elif self.direction == 'up':
-            if last_y - 1 < 0 or level[last_y - 1][last_x] == '#' or (last_x, last_y - 1) in self.snake_coords:
+            if last_y - 1 < 0:
+                if level[max_x_y][last_x] == '#' or (last_x, max_x_y) in self.snake_coords:
+                    return 'game_over'
+                else:
+                    self.snake_coords.append((last_x, max_x_y))
+            elif level[last_y - 1][last_x] == '#' or (last_x, last_y - 1) in self.snake_coords:
                 return 'game_over'
-            self.snake_coords.append((last_x, last_y - 1))
+            else:
+                self.snake_coords.append((last_x, last_y - 1))
         elif self.direction == 'down':
-            if last_y + 1 > len(level) - 1 or level[last_y + 1][last_x] == '#' or (
-                    last_x, last_y + 1) in self.snake_coords:
+            if last_y + 1 > len(level) - 1:
+                if level[0][last_x] == '#' or (last_x, 0) in self.snake_coords:
+                    return 'game_over'
+                else:
+                    self.snake_coords.append((last_x, 0))
+            elif level[last_y + 1][last_x] == '#' or (last_x, last_y + 1) in self.snake_coords:
                 return 'game_over'
-            self.snake_coords.append((last_x, last_y + 1))
+            else:
+                self.snake_coords.append((last_x, last_y + 1))
         new_last_x, new_last_y = self.snake_coords[-1][0], self.snake_coords[-1][1]
         if level[new_last_y][new_last_x] != '@':
             self.snake_coords.pop(0)
         else:
             self.score += 1
             level[new_last_y][new_last_x] = '.'
-            create_apple(level, self)
+            win = create_apple(level, self)
             spawn_particles_on_eat(new_last_x * TILE_SIZE, new_last_y * TILE_SIZE)
             load_sound('eat_food.mp3').play()
+            if win:
+                return 'win'
         return 'continue'
 
 
@@ -287,9 +313,12 @@ class Apple(pygame.sprite.Sprite):
 
 
 class GameOver(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, type='game_over'):
         super().__init__(game_over_group)
-        self.image = load_image("game_over_screen.jpg")
+        if type == 'win':
+            self.image = load_image('win_screen.jpg')
+        else:
+            self.image = load_image("game_over_screen.jpg")
         self.rect = self.image.get_rect()
         self.rect.x = - WIDTH
         self.rect.y = 0
@@ -445,15 +474,16 @@ def generate_level(level, snake):
                 Apple(x, y)
     for i in range(len(snake.snake_coords)):
         x, y = snake.snake_coords[i][0], snake.snake_coords[i][1]
+        max_x_y = len(level) - 1
         if i == 0:
             next_x, next_y = snake.snake_coords[i + 1][0], snake.snake_coords[i + 1][1]
-            if x < next_x:
+            if not (x == 0 and next_x == max_x_y) and (x < next_x or (x == max_x_y and next_x == 0)):
                 SnakePart('end_left', x, y)
-            elif x > next_x:
+            elif x > next_x or (x == 0 and next_x == max_x_y):
                 SnakePart('end_right', x, y)
-            elif y < next_y:
+            elif not (y == 0 and next_y == max_x_y) and (y < next_y or (y == max_x_y and next_y == 0)):
                 SnakePart('end_up', x, y)
-            elif y > next_y:
+            elif y > next_y or (y == 0 and next_y == max_x_y):
                 SnakePart('end_down', x, y)
         elif i == len(snake.snake_coords) - 1:
             if snake.direction == 'right':
@@ -467,6 +497,24 @@ def generate_level(level, snake):
         else:
             next_x, next_y = snake.snake_coords[i + 1][0], snake.snake_coords[i + 1][1]
             prev_x, prev_y = snake.snake_coords[i - 1][0], snake.snake_coords[i - 1][1]
+            # если змейка заходит за границы, меняем значения координат следующего/прошлого куска в переменных
+            if x == 0 and next_x == max_x_y:
+                next_x = -1
+            elif x == 0 and prev_x == max_x_y:
+                prev_x = -1
+            elif x == max_x_y and next_x == 0:
+                next_x = x + 1
+            elif x == max_x_y and prev_x == 0:
+                prev_x = x + 1
+            if y == 0 and next_y == max_x_y:
+                next_y = -1
+            elif y == 0 and prev_y == max_x_y:
+                prev_y = -1
+            elif y == max_x_y and next_y == 0:
+                next_y = y + 1
+            elif y == max_x_y and prev_y == 0:
+                prev_y = y + 1
+
             if prev_x == x == next_x:
                 SnakePart('vertical', x, y)
             elif prev_y == y == next_y:
@@ -496,8 +544,8 @@ def create_apple(level, snake):
     if free_cells:
         apple_row, apple_col = random.choice(free_cells)
         level[apple_row][apple_col] = '@'
-    else:
-        print("Нет места для яблока!")
+        return False
+    return True  # победа если нет места для яблока
 
 
 def draw_score(number, screen):
@@ -798,11 +846,11 @@ def play():
                 generate_level(level, snake)
                 if snake_alive:
                     ongoing = snake.move(level)
-                if ongoing == 'game_over':
+                if ongoing == 'game_over' or ongoing == 'win':
                     snake_alive = False
                 if not snake_alive:
                     if not game_over_flag:
-                        GameOver()
+                        GameOver(type=ongoing)
                         pygame.mixer.music.stop()
                         load_sound('game_over.mp3').play()
                         game_over_flag = True
