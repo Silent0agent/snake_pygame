@@ -2,7 +2,7 @@
 ## Об игре
 
 Классическая игра "Змейка", где игрок управляет змеёй, собирающей еду на игровом поле. Цель – набрать максимальное количество очков, избегая столкновений со стенами и собственным хвостом.
-
+![game_screenshot](https://github.com/Silent0agent/snake_pygame/blob/release/1.2.0/presentation/screenshots/screenshot_6.png)
 
 ### Использованные языки программирования
 * ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
