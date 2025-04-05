@@ -49,5 +49,3 @@ _Ниже показан пример того, как можно установ
 Если у вас есть какие-либо вопросы по поводу проекта, можете писать мне на почту - Silent0agent@yandex.ru
 
 Ссылка на проект: [https://github.com/Silent0agent/snake_pygame](https://github.com/Silent0agent/snake_pygame)
-
-<p align="right">(<a href="#readme-top">вернуться вверх</a>)</p>
