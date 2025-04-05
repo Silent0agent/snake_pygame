@@ -25,10 +25,11 @@ class Border(pygame.sprite.Sprite):  # класс Border используетс�
             self.rect = pygame.Rect(x1, y1, x2 - x1, 1)
 
 
-class Particle(pygame.sprite.Sprite):
+class AppleParticle(pygame.sprite.Sprite):
     def __init__(self, x, y, color):
         super().__init__(particle_group)
         part_side = random.randint(3, 9)
+
         self.image = pygame.Surface((part_side, part_side))
         self.image.fill(color)
         self.rect = self.image.get_rect(center=(x + 12, y + 12))
@@ -46,6 +47,35 @@ class Particle(pygame.sprite.Sprite):
         elif (pygame.sprite.spritecollideany(self, vertical_borders_group) or
               pygame.sprite.spritecollideany(self, horizontal_borders_group)):
             self.kill()  # Удаляем спрайт, если он заходит за пределы игрового поля
+
+
+class WallParticle(pygame.sprite.Sprite):
+    stars = [load_image(star_image)]
+    for scale in (5, 7.5, 10, 15):
+        stars.append(pygame.transform.scale(stars[0], (scale, scale)))
+    stars.pop(0)
+
+    def __init__(self, x, y):
+        super().__init__(particle_group)
+        self.image = random.choice(self.stars)
+        self.rect = self.image.get_rect(center=(x + 12, y + 12))
+        self.velocity = [random.choice(range(-5, 6)), random.choice(range(-5, 6))]
+        self.rect.x, self.rect.y = x, y
+        self.lifetime = random.randint(4, 5)
+        self.gravity = GRAVITY
+
+    def update(self):
+        self.lifetime -= 1
+        self.velocity[1] += self.gravity
+        self.rect.x += self.velocity[0]
+        self.rect.y += self.velocity[1]
+        if self.lifetime <= 0:
+            self.kill()
+        elif (pygame.sprite.spritecollideany(self, vertical_borders_group) or
+              pygame.sprite.spritecollideany(self, horizontal_borders_group)):
+            self.kill()
+        self.vel_x = random.uniform(-1, 2)
+        self.vel_y = random.uniform(-1, 2)
 
 
 class MiniTile(pygame.sprite.Sprite):
@@ -104,13 +134,14 @@ class AnimatedSnakeShowcase(pygame.sprite.Sprite):  # критерий аним�
         self.image = self.frames[self.cur_frame]
 
 
-class Apple(pygame.sprite.Sprite):
+class AnimatedApple(pygame.sprite.Sprite):
     def __init__(self, x, y, scaled=True):
-        super().__init__(all_sprites)
-        self.pos_x = x
-        self.pos_y = y
-        image = current_images['apple']
-        if scaled:
+        super().__init__(animated_group)
+        self.scaled = scaled
+        self.frames = list(current_apple_images.values())
+        self.cur_frame = 0
+        image = self.frames[self.cur_frame]
+        if self.scaled:
             scaled_image = pygame.transform.scale(image, (
                 int(image.get_width() / 50 * TILE_SIZE), int(image.get_height() / 50 * TILE_SIZE)))
             self.image = scaled_image
@@ -119,6 +150,16 @@ class Apple(pygame.sprite.Sprite):
         else:
             self.image = image
             self.rect = self.image.get_rect().move(x * 50, y * 50)
+
+    def update(self):
+        self.cur_frame = (self.cur_frame + 1) % len(self.frames)
+        image = self.frames[self.cur_frame]
+        if self.scaled:
+            scaled_image = pygame.transform.scale(image, (
+                int(image.get_width() / 50 * TILE_SIZE), int(image.get_height() / 50 * TILE_SIZE)))
+            self.image = scaled_image
+        else:
+            self.image = image
 
 
 class GameOver(pygame.sprite.Sprite):

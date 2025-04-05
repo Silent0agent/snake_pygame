@@ -2,6 +2,7 @@ from screens import *
 from draw import *
 from snake import Snake
 from render import render_level
+from utils import init_db
 
 
 class Game:
@@ -18,6 +19,7 @@ class Game:
         global music_menu_flag
         pygame.init()
         pygame.mixer.init()
+        init_db('..\\statistics\\player_statistics.db')
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
         screen.fill((0, 0, 0))
         pygame.display.set_caption('Twisty Zapper')
@@ -109,8 +111,10 @@ class Game:
                             game_over_flag = True
                     game_over_group.update()
                     particle_group.update()
+                    animated_group.update()
                     # Рисование всех спрайтов
                     all_sprites.draw(screen)
+                    animated_group.draw(screen)
                     particle_group.draw(screen)
                     game_over_group.draw(screen)
                     if game_over_flag:

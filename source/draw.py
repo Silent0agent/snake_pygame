@@ -1,5 +1,7 @@
 import pygame
 
+from utils import connect_to_db
+
 
 def draw_score(number, screen):
     font = pygame.font.Font('..\\assets\\fonts\\segoeprint.ttf', 28)
@@ -11,17 +13,11 @@ def draw_score(number, screen):
 
 
 def draw_record(difficulty, level_num, screen):
-    difficulty_num = '1'
-    if difficulty == 'easy':
-        difficulty_num = '1'
-    elif difficulty == 'normal':
-        difficulty_num = '2'
-    elif difficulty == 'hard':
-        difficulty_num = '3'
-    with open('..\\statistics\\stats.txt', 'r', encoding='UTF-8') as file:
-        lines = file.readlines()
-    line_number = level_num + int(difficulty_num) - 1 + (int(difficulty_num) - 1) * 10
-    number = int(lines[line_number].rstrip().split(':')[1][1:])
+    con, cur = connect_to_db('..\\statistics\\player_statistics.db')
+    number = cur.execute(
+        'SELECT score FROM High_scores JOIN Difficulties ON High_scores.difficulty_id = Difficulties.id '
+        'WHERE name = ? AND level_num = ?',
+        (difficulty, level_num)).fetchone()[0]
     font = pygame.font.Font('..\\assets\\fonts\\segoeprint.ttf', 20)
     string_rendered = font.render(f'Рекорд: {number}', 1, (255, 106, 0))
     intro_rect = string_rendered.get_rect()

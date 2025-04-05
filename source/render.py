@@ -23,7 +23,9 @@ def render_level(level, snake):
                 Tile('wall', x, y)
             elif level[y][x] == '@':
                 Tile('empty', x, y)
-                Apple(x, y)
+                # Apple(x, y)
+                if len(animated_group) == 0:
+                    AnimatedApple(x, y)
     for i in range(len(snake.snake_coords)):
         x, y = snake.snake_coords[i][0], snake.snake_coords[i][1]
         max_x_y = len(level) - 1
@@ -84,5 +86,12 @@ def render_level(level, snake):
 def render_particles_on_eat(x, y):
     color = (240, 0, 0)
     for _ in range(10):  # 10 частиц за раз
-        particle = Particle(x, y, color)
+        particle = AppleParticle(x, y, color)
+        particle_group.add(particle)
+
+
+def render_particles_on_collision(x, y):
+    color = (134, 136, 138)
+    for _ in range(5):
+        particle = WallParticle(x, y)
         particle_group.add(particle)

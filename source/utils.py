@@ -1,4 +1,6 @@
+from datetime import datetime
 import os
+import sqlite3
 import sys
 
 import pygame
@@ -46,7 +48,7 @@ def load_image(name, colorkey=None):
     return image
 
 
-def cut_sprite_sheet(sheet, columns, rows, snake_images_dict):
+def cut_snake_sprite_sheet(sheet, columns, rows, snake_images_dict):
     rect = pygame.Rect(0, 0, sheet.get_width() // columns,
                        sheet.get_height() // rows)
     frame_location = (0, 0)
@@ -79,6 +81,16 @@ def cut_sprite_sheet(sheet, columns, rows, snake_images_dict):
     snake_images_dict['end_up'] = sheet.subsurface(pygame.Rect(frame_location, rect.size))
 
 
+def cut_apple_sprite_sheet(sheet, columns, rows, apple_images):
+    rect = pygame.Rect(0, 0, sheet.get_width() // columns,
+                       sheet.get_height() // rows)
+    for j in range(rows):
+        for i in range(columns):
+            frame_location = (rect.w * i, rect.h * j)
+            apple_images[f'{j}{i}'] = (sheet.subsurface(pygame.Rect(
+                frame_location, rect.size)))
+
+
 def load_level(filename):
     filename = "..\\levels\\" + filename
     with open(filename, 'r') as mapFile:
@@ -87,24 +99,37 @@ def load_level(filename):
     return list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
 
 
+def init_db(db_name):
+    con, cur = connect_to_db(db_name)
+    cur.execute('CREATE TABLE IF NOT EXISTS Difficulties (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR)')
+    cur.execute(
+        'CREATE TABLE IF NOT EXISTS High_scores (id INTEGER  PRIMARY KEY AUTOINCREMENT, difficulty_id '
+        'INTEGER REFERENCES difficulties (id), level_num INTEGER, score INTEGER, date DATETIME)')
+    cur.execute('INSERT OR IGNORE INTO Difficulties (id, name) VALUES (?, ?)', (1, 'easy'))
+    cur.execute('INSERT OR IGNORE INTO Difficulties (id, name) VALUES (?, ?)', (2, 'normal'))
+    cur.execute('INSERT OR IGNORE INTO Difficulties (id, name) VALUES (?, ?)', (3, 'hard'))
+    for difficulty in range(3):
+        for level in range(10):
+            cur.execute(
+                'INSERT OR IGNORE INTO High_scores (id, difficulty_id, level_num, score, date) VALUES (?, ?, ?, ?, ?)',
+                (((difficulty * 10) + (level + 1)),
+                 difficulty + 1, level + 1, 0, None))
+    con.commit()
+
+
+def connect_to_db(db_name):
+    con = sqlite3.connect(db_name)
+    cur = con.cursor()
+    return con, cur
+
+
 def update_stats(difficulty, level_num, score):
-    difficulty_num = '1'
-    if difficulty == 'easy':
-        difficulty_num = '1'
-    elif difficulty == 'normal':
-        difficulty_num = '2'
-    elif difficulty == 'hard':
-        difficulty_num = '3'
-    with open('..\\statistics\\stats.txt', 'r', encoding='UTF-8') as file:
-        # Прочитаем файл целиком и сохраним каждую строку в список
-        lines = file.readlines()
-    new_line = f'{level_num} уровень: {score}\n'
-    line_number = level_num + int(difficulty_num) - 1 + (int(difficulty_num) - 1) * 10
-    try:
-        if int(lines[line_number].rstrip().split(':')[1][1:]) >= score:
-            return
-        lines[line_number] = new_line
-    except IndexError:
-        print(f'Ошибка: Строка {line_number} отсутствует.')
-    with open('..\\statistics\\stats.txt', 'w', encoding='UTF-8') as file:
-        file.writelines(lines)
+    con, cur = connect_to_db('..\\statistics\\player_statistics.db')
+    high_scores_id, org_score = cur.execute(
+        'SELECT High_scores.id, score FROM High_scores JOIN Difficulties ON High_scores.difficulty_id = Difficulties.id'
+        ' WHERE Difficulties.name = ? AND High_scores.level_num = ?',
+        (difficulty, level_num)).fetchone()
+    if org_score >= score:
+        return
+    cur.execute('UPDATE High_scores SET score = ?, date = ? WHERE id = ?', (score, datetime.now(), high_scores_id))
+    con.commit()

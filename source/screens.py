@@ -126,14 +126,28 @@ def start_screen_3(screen, clock, difficulty):
 
 
 def stats_screen(screen, clock):
-    with open('..\\statistics\\stats.txt', 'r', encoding='UTF-8') as file:
-        lines = file.readlines()
-    intro_text = [line.rstrip() for line in lines]
-    easy = intro_text[0:11]
-    normal = intro_text[11:22]
-    hard = intro_text[22:33]
+    def get_score_date(title, difficulty):
+        query = """
+            SELECT score, date 
+            FROM High_scores 
+            JOIN Difficulties ON High_scores.difficulty_id = Difficulties.id 
+            WHERE name = ?
+        """
+        results = cur.execute(query, (difficulty,)).fetchall()
 
-    font = pygame.font.Font('..\\assets\\fonts\\segoeprint.ttf', 20)
+        formatted_results = [
+            f"{i + 1} уровень: {score} "
+            f"{datetime.strptime(date, '%Y-%m-%d %H:%M:%S.%f').strftime('%d.%m.%Y %H:%M') if date else ''}"
+            for i, (score, date) in enumerate(results)
+        ]
+        return [title] + formatted_results
+
+    con, cur = connect_to_db('..\\statistics\\player_statistics.db')
+    easy = get_score_date('Легкий уровень сложности', 'easy')
+    normal = get_score_date('Средний уровень сложности', 'normal')
+    hard = get_score_date('Высокий уровень сложности', 'hard')
+
+    font = pygame.font.Font('..\\assets\\fonts\\segoeprint.ttf', 17)
     stats_color = (255, 106, 0)
 
     def draw(x, start_y, text_list, color):
@@ -151,7 +165,7 @@ def stats_screen(screen, clock):
     draw(400, 0, normal, stats_color)
     draw(200, 400, hard, stats_color)
     draw(425, 760, ['Нажмите ESC, чтобы выйти'], (255, 255, 0))
-
+    #
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -165,15 +179,18 @@ def stats_screen(screen, clock):
 
 
 def settings_screen(screen, clock):
-    global current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image
+    global current_snake_sprite_sheet, current_empty_image, current_apple_sprite_sheet, current_wall_image
     snake_changed_flag = True
+    apple_changed_flag = True
     fon = pygame.transform.scale(load_image('background_images\\menu_screens\\settings_menu.jpg'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
 
-    def load_sprites(current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image):
-        cut_sprite_sheet(load_image(sprites_sheets[current_sprite_sheet]), 5, 4, current_snake_images)
+    def load_sprites(current_snake_sprite_sheet, current_empty_image, current_apple_sprite_sheet, current_wall_image):
+        cut_snake_sprite_sheet(load_image(snake_sprites_sheets[current_snake_sprite_sheet]), 5, 4,
+                               current_snake_images)
+        cut_apple_sprite_sheet(load_image(apple_sprites_sheets[current_apple_sprite_sheet]), 5, 2,
+                               current_apple_images)
         current_images['empty'] = load_image(empty_images[current_empty_image])
-        current_images['apple'] = load_image(apple_images[current_apple_image])
         current_images['wall'] = load_image(wall_images[current_wall_image])
 
     def draw_sprites():
@@ -181,15 +198,20 @@ def settings_screen(screen, clock):
         SnakePart('horizontal', 2, 2, scaled=False)
         SnakePart('head_right', 3, 2, scaled=False)
         Tile('empty', 2, 6, scaled=False)
-        Apple(2, 9, scaled=False)
+        # AnimatedApple(2, 9, scaled=False)
         Tile('wall', 2, 12, scaled=False)
         all_sprites.draw(screen)
         if snake_changed_flag:
             for spr in animated_group:
-                spr.kill()
+                if not isinstance(spr, AnimatedApple):
+                    spr.kill()
             AnimatedSnakeShowcase(10.5, 2)
-        else:
-            animated_group.update()
+        if apple_changed_flag:
+            for spr in animated_group:
+                if not isinstance(spr, AnimatedSnakeShowcase):
+                    spr.kill()
+            AnimatedApple(2, 9, scaled=False)
+        animated_group.update()
         animated_group.draw(screen)
 
     while True:
@@ -200,10 +222,10 @@ def settings_screen(screen, clock):
                 x, y = event.pos
                 if 400 <= x <= 550:
                     if 25 <= y <= 80:
-                        if current_sprite_sheet == 0:
-                            current_sprite_sheet = len(sprites_sheets) - 1
+                        if current_snake_sprite_sheet == 0:
+                            current_snake_sprite_sheet = len(snake_sprites_sheets) - 1
                         else:
-                            current_sprite_sheet -= 1
+                            current_snake_sprite_sheet -= 1
                         snake_changed_flag = True
                         click_sound()
                     elif 190 <= y <= 245:
@@ -213,10 +235,11 @@ def settings_screen(screen, clock):
                             current_empty_image -= 1
                         click_sound()
                     elif 360 <= y <= 420:
-                        if current_apple_image == 0:
-                            current_apple_image = len(apple_images) - 1
+                        if current_apple_sprite_sheet == 0:
+                            current_apple_sprite_sheet = len(apple_sprites_sheets) - 1
                         else:
-                            current_apple_image -= 1
+                            current_apple_sprite_sheet -= 1
+                        apple_changed_flag = True
                         click_sound()
                     elif 530 <= y <= 580:
                         if current_wall_image == 0:
@@ -226,10 +249,10 @@ def settings_screen(screen, clock):
                         click_sound()
                 elif 565 <= x <= 710:
                     if 25 <= y <= 80:
-                        if current_sprite_sheet == len(sprites_sheets) - 1:
-                            current_sprite_sheet = 0
+                        if current_snake_sprite_sheet == len(snake_sprites_sheets) - 1:
+                            current_snake_sprite_sheet = 0
                         else:
-                            current_sprite_sheet += 1
+                            current_snake_sprite_sheet += 1
                         snake_changed_flag = True
                         click_sound()
                     elif 190 <= y <= 245:
@@ -239,10 +262,11 @@ def settings_screen(screen, clock):
                             current_empty_image += 1
                         click_sound()
                     elif 360 <= y <= 420:
-                        if current_apple_image == len(apple_images) - 1:
-                            current_apple_image = 0
+                        if current_apple_sprite_sheet == len(apple_sprites_sheets) - 1:
+                            current_apple_sprite_sheet = 0
                         else:
-                            current_apple_image += 1
+                            current_apple_sprite_sheet += 1
+                        apple_changed_flag = True
                         click_sound()
                     elif 530 <= y <= 580:
                         if current_wall_image == len(wall_images) - 1:
@@ -252,7 +276,9 @@ def settings_screen(screen, clock):
                         click_sound()
                 if 500 <= x <= 700 and 700 <= y <= 780:
                     click_sound()
-                    current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image = 0, 0, 0, 0
+                    (current_snake_sprite_sheet, current_empty_image, current_apple_sprite_sheet,
+                     current_wall_image) = 0, 0, 0, 0
+                    snake_changed_flag, apple_changed_flag = True, True
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     reset_sprites()
@@ -261,7 +287,8 @@ def settings_screen(screen, clock):
         reset_sprites()
         screen.fill((0, 0, 0))
         screen.blit(fon, (0, 0))
-        load_sprites(current_sprite_sheet, current_empty_image, current_apple_image, current_wall_image)
+        load_sprites(current_snake_sprite_sheet, current_empty_image, current_apple_sprite_sheet, current_wall_image)
         draw_sprites()
         snake_changed_flag = False
-        clock.tick(START_SCREENS_FPS)
+        apple_changed_flag = False
+        clock.tick(6)
