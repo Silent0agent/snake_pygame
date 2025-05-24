@@ -1,4 +1,7 @@
 import random
+
+import pygame.sprite
+
 from settings import *
 
 
@@ -49,19 +52,22 @@ class AppleParticle(pygame.sprite.Sprite):
             self.kill()  # Удаляем спрайт, если он заходит за пределы игрового поля
 
 
-class WallParticle(pygame.sprite.Sprite):
+class StarParticle(pygame.sprite.Sprite):
     stars = [load_image(star_image)]
     for scale in (5, 7.5, 10, 15):
         stars.append(pygame.transform.scale(stars[0], (scale, scale)))
     stars.pop(0)
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, type='wall_collision'):
         super().__init__(particle_group)
         self.image = random.choice(self.stars)
         self.rect = self.image.get_rect(center=(x + 12, y + 12))
         self.velocity = [random.choice(range(-5, 6)), random.choice(range(-5, 6))]
         self.rect.x, self.rect.y = x, y
-        self.lifetime = random.randint(4, 5)
+        if type == 'wall_collision':
+            self.lifetime = random.randint(4, 5)
+        elif type == 'boom':
+            self.lifetime = random.randint(7, 8)
         self.gravity = GRAVITY
 
     def update(self):
@@ -76,6 +82,40 @@ class WallParticle(pygame.sprite.Sprite):
             self.kill()
         self.vel_x = random.uniform(-1, 2)
         self.vel_y = random.uniform(-1, 2)
+
+
+class ShieldParticle(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()  # Инициализируем родительский класс Sprite
+        self.color = (0, random.randint(100, 200), 255)
+        self.alpha = random.randint(80, 180)
+        self.size = random.randint(3, 6)
+
+        # Создаем поверхность для частицы
+        self.image = pygame.Surface((self.size * 2, self.size * 2), pygame.SRCALPHA)
+        pygame.draw.circle(
+            self.image,
+            (*self.color, self.alpha),  # RGBA
+            (self.size, self.size),
+            self.size
+        )
+
+        self.rect = self.image.get_rect(center=(x * TILE_SIZE + x // 2 + random.uniform(-5, 5),
+                                                y * TILE_SIZE + y // 2 + random.uniform(-5, 5)))
+        self.lifetime = random.randint(20, 40)
+
+    def update(self):
+        self.lifetime -= 1
+        self.rect.x += random.uniform(-0.5, 0.5)
+        self.rect.y += random.uniform(-0.5, 0.5)
+
+        # Плавное исчезновение
+        if self.lifetime < 20:
+            self.alpha = max(0, self.alpha - 10)
+            self.image.set_alpha(self.alpha)
+
+        if self.lifetime <= 0:
+            self.kill()
 
 
 class MiniTile(pygame.sprite.Sprite):
@@ -134,11 +174,36 @@ class AnimatedSnakeShowcase(pygame.sprite.Sprite):  # критерий аним�
         self.image = self.frames[self.cur_frame]
 
 
-class AnimatedApple(pygame.sprite.Sprite):
+class FakeApple(pygame.sprite.Sprite):
     def __init__(self, x, y, scaled=True):
+        super().__init__(fake_apples_group, all_sprites)
+        self.scaled = scaled
+        image = list(current_apple_images.values())[-1]
+        if self.scaled:
+            scaled_image = pygame.transform.scale(image, (
+                int(image.get_width() / 50 * TILE_SIZE), int(image.get_height() / 50 * TILE_SIZE)))
+            self.image = scaled_image
+            self.rect = self.image.get_rect().move(
+                TILE_SIZE * x, TILE_SIZE * y)
+        else:
+            self.image = image
+            self.rect = self.image.get_rect().move(x * 50, y * 50)
+
+
+class AnimatedApple(pygame.sprite.Sprite):
+    def __init__(self, x, y, scaled=True, type='normal'):
         super().__init__(animated_group)
         self.scaled = scaled
-        self.frames = list(current_apple_images.values())
+        if type == 'normal':
+            self.frames = list(current_apple_images.values())
+        elif type == 'bomb':
+            self.frames = list(bomb_apple_images.values())
+        elif type == 'switch_head':
+            self.frames = list(switch_head_apple_images.values())
+        elif type == 'invincible':
+            self.frames = list(invincible_apple_images.values())
+        elif type == 'rock':
+            self.frames = list(rock_apple_images.values())
         self.cur_frame = 0
         image = self.frames[self.cur_frame]
         if self.scaled:

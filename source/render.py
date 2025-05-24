@@ -26,6 +26,30 @@ def render_level(level, snake):
                 # Apple(x, y)
                 if len(animated_group) == 0:
                     AnimatedApple(x, y)
+            elif level[y][x] == 'b':
+                Tile('empty', x, y)
+                if len(animated_group) == 0:
+                    AnimatedApple(x, y, type='bomb')
+            elif level[y][x] == 's':
+                Tile('empty', x, y)
+                if len(animated_group) == 0:
+                    AnimatedApple(x, y, type='switch_head')
+            elif level[y][x] == 'm':
+                Tile('empty', x, y)
+                if len(animated_group) == 0:
+                    AnimatedApple(x, y)
+            elif level[y][x] == 'i':
+                Tile('empty', x, y)
+                if len(animated_group) == 0:
+                    AnimatedApple(x, y, type='invincible')
+            elif level[y][x] == 'r':
+                Tile('empty', x, y)
+                if len(animated_group) == 0:
+                    AnimatedApple(x, y, type='rock')
+            elif level[y][x] == 'f':
+                Tile('empty', x, y)
+                FakeApple(x, y)
+
     for i in range(len(snake.snake_coords)):
         x, y = snake.snake_coords[i][0], snake.snake_coords[i][1]
         max_x_y = len(level) - 1
@@ -48,6 +72,8 @@ def render_level(level, snake):
                 SnakePart('head_up', x, y)
             elif snake.direction == 'down':
                 SnakePart('head_down', x, y)
+            if snake.shield_active:
+                render_shield_effect(x, y)
         else:
             next_x, next_y = snake.snake_coords[i + 1][0], snake.snake_coords[i + 1][1]
             prev_x, prev_y = snake.snake_coords[i - 1][0], snake.snake_coords[i - 1][1]
@@ -83,15 +109,26 @@ def render_level(level, snake):
                 SnakePart('angle2', x, y)
 
 
-def render_particles_on_eat(x, y):
-    color = (240, 0, 0)
+def render_particles_on_eat(x, y, color=(240, 0, 0)):
     for _ in range(10):  # 10 частиц за раз
         particle = AppleParticle(x, y, color)
         particle_group.add(particle)
 
 
 def render_particles_on_collision(x, y):
-    color = (134, 136, 138)
     for _ in range(5):
-        particle = WallParticle(x, y)
+        particle = StarParticle(x, y)
+        particle_group.add(particle)
+
+
+def render_particles_on_boom(x, y):
+    for _ in range(8):
+        particle = StarParticle(x, y, type='boom')
+        particle_group.add(particle)
+
+
+def render_shield_effect(x, y):
+    # Создаем частицы для эффекта активации
+    for _ in range(7):
+        particle = ShieldParticle(x, y)
         particle_group.add(particle)
